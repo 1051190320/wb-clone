@@ -1,0 +1,39 @@
+{
+  "serial": {
+    "port": "auto",
+    "baud": 115200,
+    "vid": ["0x1A86", "0x10C4", "0x303A"],
+    "pid": null
+  },
+  "transport": "serial",
+  "mqtt": {
+    "enabled": false,
+    "broker": "builtin",
+    "host": "127.0.0.1",
+    "port": 1883,
+    "topic": "wb/frame"
+  },
+  "http": {
+    "enabled": true,
+    "port": 8788
+  },
+  "agent": "HY3",
+  "claude_log": {
+    "enabled": true,
+    "dirs": ["~/.claude/projects"]
+  },
+  "adapters": {
+    "codex":  {"enabled": false, "dirs": []},
+    "jsonl":  {"enabled": false, "dirs": []},
+    "process": {
+      "enabled": false,
+      "specs": [
+        {"match": ["doubao"], "title": "豆包执行", "sub": ""},
+        {"match": ["dsh"],     "title": "DSH 执行",  "sub": ""},
+        {"match": ["codex"],   "title": "Codex 执行", "sub": ""}
+      ]
+    }
+  },
+  "heartbeat_sec": 2.0,
+  "demo": false
+}

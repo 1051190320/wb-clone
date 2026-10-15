@@ -1,0 +1,25 @@
+# PlatformIO 构建产物
+firmware/.pio/
+firmware/.pioenvs/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# 编译产物 (烧录用 bin 统一经 GitHub Release 分发, 不入库)
+*.bin
+*.elf
+*.map
+build/
+
+# 本地私有配置
+bridge/config.local.json

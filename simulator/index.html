@@ -1,0 +1,568 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>wb-clone 桌面状态屏 · 模拟器</title>
+<style>
+  :root {
+    --bg: #f4efe6;          /* 奶油背景 */
+    --card: #fbf9f4;
+    --ink: #1a1f1c;
+    --ink2: #6e7671;
+    --mint: #8fd0b5;        /* 薄荷绿 */
+    --mint-d: #6bb89c;
+    --line: #e3ded2;
+    --green: #3d9a50;
+    --blue: #3e7cb1;
+    --teal: #2ba8a0;
+    --gold: #d9a036;
+    --red: #c0453e;
+    --gray: #969e99;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: -apple-system, "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif;
+    min-height: 100vh;
+    padding: 32px 20px;
+  }
+  .wrap {
+    max-width: 1060px;
+    margin: 0 auto;
+    display: grid;
+    grid-template-columns: 300px 1fr;
+    gap: 36px;
+    align-items: start;
+  }
+  @media (max-width: 860px) { .wrap { grid-template-columns: 1fr; } }
+
+  h1 { font-size: 20px; margin-bottom: 4px; }
+  .sub { color: var(--ink2); font-size: 13px; margin-bottom: 24px; }
+
+  /* ============ 设备外观 ============ */
+  .device {
+    width: 260px;
+    margin: 40px auto 0;
+    position: relative;
+    filter: drop-shadow(0 18px 24px rgba(60, 50, 30, .18));
+  }
+  .ears { display: flex; justify-content: space-between; padding: 0 34px; }
+  .ear {
+    width: 0; height: 0;
+    border-left: 26px solid transparent;
+    border-right: 26px solid transparent;
+    border-bottom: 44px solid var(--mint);
+    position: relative;
+  }
+  .ear::after {   /* 内耳 */
+    content: ""; position: absolute; left: -12px; top: 16px;
+    width: 0; height: 0;
+    border-left: 12px solid transparent;
+    border-right: 12px solid transparent;
+    border-bottom: 22px solid #c9ebe0;
+  }
+  .body {
+    background: linear-gradient(180deg, var(--mint) 0, var(--mint) 108px, #f6f3ec 108px, #f6f3ec 100%);
+    border-radius: 46px 46px 40px 40px;
+    padding: 14px 16px 20px;
+    margin-top: -6px;
+    position: relative;
+  }
+  .screen {
+    background: #f2f4f1;
+    border-radius: 18px;
+    height: 372px;
+    overflow: hidden;
+    position: relative;
+    box-shadow: inset 0 0 0 3px rgba(20, 26, 22, .85), inset 0 2px 10px rgba(0,0,0,.12);
+    font-size: 13px;
+  }
+  .paw {   /* 装饰猫爪 */
+    width: 34px; height: 26px;
+    background: var(--mint);
+    border-radius: 12px 12px 14px 14px;
+    margin: 12px auto 0;
+    position: relative;
+  }
+  .paw::before, .paw::after {
+    content: ""; position: absolute; top: -8px;
+    width: 10px; height: 10px; background: var(--mint); border-radius: 50%;
+  }
+  .paw::before { left: 3px; }
+  .paw::after { right: 3px; }
+  .cable {
+    position: absolute; right: -70px; bottom: 30px; width: 90px; height: 60px;
+  }
+
+  /* ============ 屏幕 UI (复刻固件布局) ============ */
+  .scr-top {
+    height: 24px; background: #141a16; color: #fff;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 10px; font-size: 11px; letter-spacing: .3px;
+  }
+  .scr-top .r { display: flex; align-items: center; gap: 6px; font-variant-numeric: tabular-nums; }
+  .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); }
+  .dot.off { background: var(--red); }
+  .scr-main { padding: 10px 12px 0; }
+  .scr-status { display: flex; gap: 8px; align-items: stretch; min-height: 44px; }
+  .st-bar { width: 4px; border-radius: 2px; background: var(--gray); flex: none; }
+  .st-title { font-size: 21px; font-weight: 700; line-height: 1.2; }
+  .st-sub { font-size: 11px; color: var(--ink2); margin-top: 5px; }
+  .scr-sep { height: 1px; background: var(--line); margin: 10px 0 8px; }
+  .agent-tag {
+    display: inline-block; background: #e9f0ea; color: #2e6e46;
+    font-size: 10px; padding: 3px 10px; border-radius: 9px; margin-bottom: 8px;
+  }
+  .scr-logs { font-size: 11px; }
+  .log-line { display: flex; align-items: baseline; gap: 6px; height: 18px; white-space: nowrap; }
+  .log-line .ld { width: 6px; height: 6px; border-radius: 50%; flex: none; transform: translateY(-1px); }
+  .log-line .lt { color: var(--ink2); font-size: 10px; flex: none; }
+  .log-line .lx { flex: none; font-weight: 600; }
+  .log-line .ls { color: var(--ink); overflow: hidden; text-overflow: ellipsis; }
+  .scr-agentline { font-size: 10px; color: var(--ink2); margin-top: 4px; }
+  /* 统计网格 (协议 v1.1, 布局参考真机屏幕) */
+  .scr-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 16px; margin: 6px 0 4px; }
+  .g-cell .g-label { font-size: 10px; color: var(--ink2); }
+  .g-cell .g-value { font-size: 13px; font-weight: 600; color: var(--ink); margin-top: 1px;
+                     white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .scr-progress { margin: 10px 4px 0; height: 14px; border: 1px solid var(--line); border-radius: 7px; position: relative; overflow: hidden; }
+  .scr-progress .fill { position: absolute; left: 3px; top: 3px; bottom: 3px; border-radius: 4px; background: var(--teal); width: 0; }
+  .scr-progress.indet .fill { width: 25% !important; animation: slide 2s ease-in-out infinite; }
+  @keyframes slide { 0%,100% { left: 3px; } 50% { left: calc(100% - 25% - 3px); } }
+  .scr-bottom { position: absolute; bottom: 0; left: 0; right: 0; padding: 0 12px 8px; }
+  .scr-bottom .sep { height: 1px; background: var(--line); margin-bottom: 6px; }
+  .scr-bottom .row { display: flex; justify-content: space-between; font-size: 10px; color: var(--ink2); line-height: 1.7; }
+  .scr-wait { padding: 90px 20px 0; text-align: center; }
+  .scr-wait .t { font-size: 19px; font-weight: 700; }
+  .scr-wait .s { font-size: 11px; color: var(--ink2); margin-top: 10px; }
+
+  /* ============ 控制面板 ============ */
+  .panel { background: var(--card); border: 1px solid var(--line); border-radius: 18px; padding: 22px; }
+  .modes { display: flex; gap: 8px; margin-bottom: 18px; }
+  .modes button {
+    flex: 1; padding: 9px 0; border: 1px solid var(--line); background: #fff;
+    border-radius: 10px; font-size: 13px; cursor: pointer; color: var(--ink2);
+  }
+  .modes button.on { background: var(--ink); color: #fff; border-color: var(--ink); }
+  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 18px; }
+  .st-btn {
+    padding: 10px 0; border-radius: 10px; border: 1px solid var(--line);
+    background: #fff; cursor: pointer; font-size: 13px; color: var(--ink);
+    display: flex; align-items: center; justify-content: center; gap: 7px;
+  }
+  .st-btn .sw { width: 9px; height: 9px; border-radius: 50%; }
+  .st-btn:hover { border-color: var(--ink2); }
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 16px; }
+  label { font-size: 12px; color: var(--ink2); display: block; margin-bottom: 6px; }
+  input[type=text] {
+    width: 100%; padding: 8px 10px; border: 1px solid var(--line); border-radius: 9px;
+    font-size: 13px; background: #fff; color: var(--ink);
+  }
+  input[type=range] { width: 100%; accent-color: var(--mint-d); }
+  .val { float: right; font-variant-numeric: tabular-nums; color: var(--ink); }
+  .frame-box {
+    margin-top: 18px; background: #141a16; color: #b8e6d2; border-radius: 12px;
+    padding: 14px 16px; font-family: "SF Mono", Menlo, Consolas, monospace;
+    font-size: 11.5px; line-height: 1.65; white-space: pre; overflow-x: auto;
+  }
+  .hint { font-size: 12px; color: var(--ink2); margin-top: 14px; line-height: 1.8; }
+  .hint code { background: #efe9dd; padding: 1px 6px; border-radius: 5px; font-size: 11px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div>
+    <h1>桌面状态屏模拟器</h1>
+    <div class="sub">wb-clone · ESP32-C3 SuperMini + GC9A01 1.28" 圆屏 240×240 · 协议帧驱动</div>
+
+    <!-- ============ 设备 ============ -->
+    <div class="device">
+      <div class="ears"><div class="ear"></div><div class="ear"></div></div>
+      <div class="body">
+        <div class="screen" id="screen">
+          <!-- 顶栏 -->
+          <div class="scr-top">
+            <span>workbuddy</span>
+            <span class="r"><span id="clock">--:--</span><span class="dot" id="dot"></span></span>
+          </div>
+          <!-- 主内容 -->
+          <div class="scr-main" id="main">
+            <div class="scr-status">
+              <div class="st-bar" id="stBar"></div>
+              <div>
+                <div class="st-title" id="stTitle">空闲</div>
+                <div class="st-sub" id="stSub">等待新的任务</div>
+                <div class="scr-agentline" id="stAgentLine">HY3 0:00</div>
+              </div>
+            </div>
+            <div class="scr-sep"></div>
+            <div class="agent-tag" id="agentTag">HY3</div>
+            <div class="scr-logs" id="logs"></div>
+            <div class="scr-grid" id="statsGrid" style="display:none"></div>
+            <div class="scr-progress" id="prog" style="display:none"><div class="fill" id="progFill"></div></div>
+          </div>
+          <!-- 等待连接 -->
+          <div class="scr-wait" id="waiting" style="display:none">
+            <div class="t">等待连接</div>
+            <div class="s">请启动电脑端 Bridge 程序<br>检查 USB 数据线</div>
+          </div>
+          <!-- 系统栏 -->
+          <div class="scr-bottom">
+            <div class="sep"></div>
+            <div class="row"><span id="cpuLine">CPU 0%&nbsp;&nbsp;MEM 0%&nbsp;&nbsp;存储 0%</span><span id="upLine">0分钟</span></div>
+            <div class="row"><span id="netLine"></span><span></span></div>
+          </div>
+        </div>
+        <div class="paw"></div>
+      </div>
+      <svg class="cable" viewBox="0 0 90 60"><path d="M0 30 C 30 30, 40 55, 88 55" stroke="#d8d2c4" stroke-width="7" fill="none" stroke-linecap="round"/></svg>
+    </div>
+  </div>
+
+  <!-- ============ 控制面板 ============ -->
+  <div class="panel">
+    <div class="modes">
+      <button id="mManual" class="on">手动模式</button>
+      <button id="mDemo">自动演示</button>
+      <button id="mLive">连接真实 Bridge</button>
+    </div>
+
+    <div class="grid" id="stGrid"></div>
+
+    <div class="row2">
+      <div>
+        <label>Agent 名</label>
+        <input type="text" id="agentInput" value="HY3" maxlength="11">
+      </div>
+      <div>
+        <label>进度 pg <span class="val" id="pgVal">255 动画</span></label>
+        <input type="range" id="pgRange" min="-1" max="100" value="255">
+      </div>
+    </div>
+    <div class="row2">
+      <div>
+        <label>CPU <span class="val" id="cpuVal">12%</span></label>
+        <input type="range" id="cpuRange" min="0" max="100" value="12">
+      </div>
+      <div>
+        <label>MEM <span class="val" id="memVal">46%</span></label>
+        <input type="range" id="memRange" min="0" max="100" value="46">
+      </div>
+    </div>
+    <div class="row2">
+      <div>
+        <label>存储 <span class="val" id="diskVal">36%</span></label>
+        <input type="range" id="diskRange" min="0" max="100" value="36">
+      </div>
+      <div>
+        <label>网速</label>
+        <input type="text" id="netInput" value="↓8 KiB/s ↑6 KiB/s" maxlength="23">
+      </div>
+    </div>
+
+    <div class="frame-box" id="frameBox"></div>
+
+    <div class="hint">
+      <b>手动模式</b>：点按钮切换 9 种状态，滑块调 CPU/内存/存储/进度。<br>
+      <b>自动演示</b>：模拟一次完整的 Agent 任务周期，含统计网格（剩余积分/本轮消耗/今日费用/本轮用时/模型/任务名）。<br>
+      <b>连接真实 Bridge</b>：在本机运行 <code>python3 bridge/wb_bridge.py --demo</code> 后点此模式，
+      模拟器每 500ms 拉取 <code>http://127.0.0.1:8788/state</code> 的协议帧并渲染。<br>
+      协议字段说明见 <code>docs/protocol.md</code>；统计网格字段（bal/spend/cost/dur/model/task/disk/net）由 HTTP 推送或适配器提供。
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  // ---- 状态定义 (与固件 ui.h / bridge sources.py 一致) ----
+  var ST = [
+    { name: "空闲",     color: "#969e99" },
+    { name: "准备",     color: "#3e7cb1" },
+    { name: "思考",     color: "#2ba8a0" },
+    { name: "回答",     color: "#3e7cb1" },
+    { name: "执行",     color: "#2ba8a0" },
+    { name: "等待回答", color: "#2ba8a0" },
+    { name: "等待确认", color: "#d9a036" },
+    { name: "已完成",   color: "#3d9a50" },
+    { name: "异常",     color: "#c0453e" }
+  ];
+  var LOG_COLOR = ["#3d9a50", "#3e7cb1", "#d9a036", "#c0453e", "#969e99"];
+  var DEMO_SCRIPT = [
+    { st: 1, title: "准备",     sub: "环境检查完成",        pg: -1,
+      stats: { model: "HY3-Pro", task: "部署桌面状态屏", bal: "8046.86 积分", spend: "-", cost: "-" } },
+    { st: 2, title: "思考",     sub: "正在分析需求",        pg: 255,
+      stats: { model: "HY3-Pro", task: "部署桌面状态屏", bal: "8046.86 积分", spend: "1.24 积分", cost: "2.92 积分" } },
+    { st: 4, title: "执行命令", sub: "pip install reportlab", pg: 255,
+      stats: { model: "HY3-Pro", task: "部署桌面状态屏", bal: "8046.86 积分", spend: "2.05 积分", cost: "2.92 积分" } },
+    { st: 3, title: "回答",     sub: "这是生成的第一段回复", pg: 30,
+      stats: { model: "HY3-Pro", task: "部署桌面状态屏", bal: "8046.86 积分", spend: "2.92 积分", cost: "2.92 积分" } },
+    { st: 6, title: "等待确认", sub: "是否允许执行该命令",  pg: -1,
+      stats: { model: "HY3-Pro", task: "部署桌面状态屏", bal: "8046.86 积分", spend: "2.92 积分", cost: "2.92 积分" } },
+    { st: 7, title: "已完成",   sub: "报告已生成",          pg: 100,
+      stats: { model: "HY3-Pro", task: "部署桌面状态屏", bal: "8046.86 积分", spend: "2.92 积分", cost: "2.92 积分" } },
+    { st: 0, title: "空闲",     sub: "等待新的任务",        pg: -1,
+      stats: { model: "HY3-Pro", task: "等待新任务", bal: "8046.86 积分", spend: "-", cost: "-" } }
+  ];
+
+  // ---- 屏幕状态 ----
+  var state = {
+    clock: "--:--", st: 0, title: "空闲", sub: "等待新的任务",
+    agent: "HY3", cpu: 12, mem: 46, disk: 36, up: "12分钟", pg: -1,
+    net: "↓8 KiB/s ↑6 KiB/s", dur: "0:00",
+    model: "", task: "", bal: "", spend: "", cost: "",
+    lines: [], connected: true
+  };
+
+  var $ = function (id) { return document.getElementById(id); };
+  var mode = "manual";       // manual | demo | live
+  var demoTimer = null, liveTimer = null, clockTimer = null;
+  var bootTime = Date.now() - 12 * 60 * 1000;
+  var durStart = Date.now();  // 本轮事件开始 (dur 计时)
+
+  // ---- 渲染 ----
+  function fmtUp(sec) {
+    var d = Math.floor(sec / 86400), h = Math.floor(sec % 86400 / 3600),
+        m = Math.floor(sec % 3600 / 60);
+    if (d) return d + "天" + h + "小时";
+    if (h) return h + "小时" + m + "分";
+    return m + "分钟";
+  }
+
+  function fmtDur(sec) {
+    sec = Math.max(0, Math.floor(sec));
+    var h = Math.floor(sec / 3600), m = Math.floor(sec % 3600 / 60), s = sec % 60;
+    if (h) return h + ":" + ("0" + m).slice(-2) + ":" + ("0" + s).slice(-2);
+    return m + ":" + ("0" + s).slice(-2);
+  }
+
+  function render() {
+    $("clock").textContent = state.clock;
+    $("dot").className = "dot" + (state.connected ? "" : " off");
+    $("waiting").style.display = state.connected ? "none" : "block";
+    $("main").style.display = state.connected ? "block" : "none";
+
+    $("stBar").style.background = ST[state.st].color;
+    $("stTitle").textContent = state.title;
+    $("stSub").textContent = state.sub;
+    $("stAgentLine").textContent =
+      state.agent + (state.agent && state.dur ? " " : "") + state.dur;
+    $("agentTag").textContent = state.agent || "";
+    $("agentTag").style.display = state.agent ? "inline-block" : "none";
+
+    // 日志行: 有统计网格时隐藏 (与固件布局一致)
+    var hasStats = !!(state.bal || state.spend || state.cost ||
+                      state.dur || state.model || state.task);
+    $("logs").style.display = hasStats ? "none" : "block";
+    var logs = $("logs");
+    logs.innerHTML = "";
+    state.lines.slice(0, 4).forEach(function (L) {
+      var div = document.createElement("div");
+      div.className = "log-line";
+      var c = LOG_COLOR[L.c] || LOG_COLOR[4];
+      div.innerHTML = '<span class="ld" style="background:' + c + '"></span>' +
+        '<span class="lt">' + esc(L.t) + '</span>' +
+        '<span class="lx" style="color:' + c + '">' + esc(L.x) + '</span>' +
+        '<span class="ls">' + esc(L.s) + '</span>';
+      logs.appendChild(div);
+    });
+
+    // 统计网格 (2 列 x 3 行, 布局参考真机屏幕)
+    var grid = $("statsGrid");
+    grid.style.display = hasStats ? "grid" : "none";
+    grid.innerHTML = "";
+    [["剩余积分", state.bal], ["本轮消耗", state.spend],
+     ["今日费用", state.cost], ["本轮用时", state.dur],
+     ["当前任务模型", state.model], ["任务名称", state.task]].forEach(function (cell) {
+      if (!cell[1]) return;
+      var d = document.createElement("div");
+      d.className = "g-cell";
+      d.innerHTML = '<div class="g-label">' + esc(cell[0]) + '</div>' +
+                    '<div class="g-value">' + esc(cell[1]) + '</div>';
+      grid.appendChild(d);
+    });
+
+    var prog = $("prog");
+    if (state.pg >= 0) {
+      prog.style.display = "block";
+      if (state.pg === 255) {
+        prog.classList.add("indet");
+      } else {
+        prog.classList.remove("indet");
+        $("progFill").style.width = state.pg + "%";
+      }
+    } else {
+      prog.style.display = "none";
+    }
+
+    $("cpuLine").textContent = "CPU " + state.cpu + "%  内存 " + state.mem +
+                               "%  存储 " + state.disk + "%";
+    $("upLine").textContent = state.up;
+    $("netLine").textContent = state.net || "";
+
+    var frame = {
+      clock: state.clock, st: state.st, title: state.title, sub: state.sub,
+      agent: state.agent, cpu: state.cpu, mem: state.mem, disk: state.disk,
+      up: state.up, net: state.net, dur: state.dur,
+      pg: state.pg, lines: state.lines.slice(0, 4)
+    };
+    if (state.model) frame.model = state.model;
+    if (state.task) frame.task = state.task;
+    if (state.bal) frame.bal = state.bal;
+    if (state.spend) frame.spend = state.spend;
+    if (state.cost) frame.cost = state.cost;
+    $("frameBox").textContent = JSON.stringify(frame, null, 2);
+  }
+
+  function esc(s) {
+    return String(s).replace(/[&<>"]/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c];
+    });
+  }
+
+  function pushLog(st, sub) {
+    var now = new Date();
+    state.lines.unshift({
+      t: ("0" + now.getHours()).slice(-2) + ":" + ("0" + now.getMinutes()).slice(-2),
+      x: ST[st].name,
+      c: st === 0 || st === 7 ? 0 : (st === 6 ? 2 : (st === 8 ? 3 : 1)),
+      s: sub || ""
+    });
+    if (state.lines.length > 4) state.lines.length = 4;
+  }
+
+  function setStatus(st, title, sub) {
+    state.st = st;
+    state.title = title || ST[st].name;
+    state.sub = sub || "";
+    state.dur = "0:00";
+    durStart = Date.now();
+    pushLog(st, state.sub);
+    render();
+  }
+
+  // ---- 时钟 / uptime / 本轮用时 ----
+  function tickClock() {
+    var now = new Date();
+    state.clock = ("0" + now.getHours()).slice(-2) + ":" + ("0" + now.getMinutes()).slice(-2);
+    if (mode !== "live") {
+      state.up = fmtUp((Date.now() - bootTime) / 1000);
+      state.dur = fmtDur((Date.now() - durStart) / 1000);
+    }
+    render();
+  }
+
+  // ---- 模式切换 ----
+  function stopAll() {
+    if (demoTimer) { clearInterval(demoTimer); demoTimer = null; }
+    if (liveTimer) { clearInterval(liveTimer); liveTimer = null; }
+  }
+  function setMode(m) {
+    mode = m;
+    stopAll();
+    $("mManual").className = m === "manual" ? "on" : "";
+    $("mDemo").className = m === "demo" ? "on" : "";
+    $("mLive").className = m === "live" ? "on" : "";
+    if (m === "demo") {
+      var i = 0;
+      var step = function () {
+        var d = DEMO_SCRIPT[i % DEMO_SCRIPT.length]; i++;
+        state.st = d.st; state.title = d.title; state.sub = d.sub;
+        state.pg = d.pg;
+        durStart = Date.now();
+        state.dur = "0:00";
+        if (d.stats) {
+          state.model = d.stats.model; state.task = d.stats.task;
+          state.bal = d.stats.bal; state.spend = d.stats.spend; state.cost = d.stats.cost;
+        }
+        if (mode === "demo") {
+          // 演示模式 CPU/内存/存储小幅波动 + 网速随机
+          state.cpu = Math.min(99, Math.max(3, state.cpu + (Math.random() * 24 - 12) | 0));
+          state.mem = Math.min(99, Math.max(20, state.mem + (Math.random() * 10 - 5) | 0));
+          state.disk = Math.min(99, Math.max(10, state.disk + (Math.random() * 6 - 3) | 0));
+          var rx = (Math.random() * 900) | 0, tx = (Math.random() * 500) | 0;
+          state.net = "\u2193" + rx + " KiB/s \u2191" + tx + " KiB/s";
+          pushLog(d.st, d.sub);
+        }
+        render();
+      };
+      step();
+      demoTimer = setInterval(step, 2500);
+    }
+    if (m === "live") {
+      state.connected = false;   // 先显示等待连接, 拉到帧后置 true
+      render();
+      var poll = function () {
+        fetch("http://127.0.0.1:8788/state", { mode: "cors" })
+          .then(function (r) { return r.json(); })
+          .then(function (d) {
+            if (!d || !d.frame) { state.connected = false; render(); return; }
+            var f = d.frame;
+            state.connected = true;
+            state.st = f.st; state.title = f.title; state.sub = f.sub;
+            state.agent = f.agent; state.cpu = f.cpu; state.mem = f.mem;
+            state.disk = f.disk || 0;
+            state.up = f.up; state.pg = f.pg; state.net = f.net || "";
+            state.dur = f.dur || "";
+            state.model = f.model || ""; state.task = f.task || "";
+            state.bal = f.bal || ""; state.spend = f.spend || ""; state.cost = f.cost || "";
+            if (f.lines && f.lines.length) state.lines = f.lines;
+            state.clock = f.clock;
+            render();
+          })
+          .catch(function () { state.connected = false; render(); });
+      };
+      poll();
+      liveTimer = setInterval(poll, 500);
+    }
+  }
+
+  // ---- 控件 ----
+  var grid = $("stGrid");
+  ST.forEach(function (s, i) {
+    var b = document.createElement("button");
+    b.className = "st-btn";
+    b.innerHTML = '<span class="sw" style="background:' + s.color + '"></span>' + s.name;
+    b.onclick = function () {
+      if (mode !== "manual") setMode("manual");
+      var sub = ["等待新的任务", "环境检查完成", "正在分析需求", "生成回复内容",
+                 "正在执行任务", "需要你回答", "需要你确认", "任务已完成", "发生错误"][i];
+      state.pg = (i === 2 || i === 4) ? 255 : (i === 7 ? 100 : -1);
+      state.model = state.task = state.bal = state.spend = state.cost = "";
+      $("pgRange").value = state.pg;
+      $("pgVal").textContent = state.pg === 255 ? "255 动画" : state.pg;
+      setStatus(i, s.name, sub);
+    };
+    grid.appendChild(b);
+  });
+
+  $("mManual").onclick = function () { setMode("manual"); };
+  $("mDemo").onclick = function () { setMode("demo"); };
+  $("mLive").onclick = function () { setMode("live"); };
+
+  $("agentInput").oninput = function () { state.agent = this.value; render(); };
+  $("cpuRange").oninput = function () { state.cpu = +this.value; $("cpuVal").textContent = this.value + "%"; render(); };
+  $("memRange").oninput = function () { state.mem = +this.value; $("memVal").textContent = this.value + "%"; render(); };
+  $("diskRange").oninput = function () { state.disk = +this.value; $("diskVal").textContent = this.value + "%"; render(); };
+  $("netInput").oninput = function () { state.net = this.value; render(); };
+  $("pgRange").oninput = function () {
+    state.pg = +this.value;
+    $("pgVal").textContent = this.value === "255" ? "255 动画" : this.value;
+    render();
+  };
+
+  // ---- 启动 ----
+  tickClock();
+  clockTimer = setInterval(tickClock, 1000);
+  state.lines = [
+    { t: "11:33", x: "成功", c: 0, s: "下次执行 08:50" },
+    { t: "10:02", x: "执行", c: 1, s: "每日全网热点聚..." }
+  ];
+  render();
+})();
+</script>
+</body>
+</html>

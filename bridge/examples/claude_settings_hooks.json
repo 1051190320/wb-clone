@@ -1,0 +1,25 @@
+{
+  "_comment": "Claude Code hooks 接入示例: 复制到 ~/.claude/settings.json (或项目的 .claude/settings.json), 把 <BRIDGE_DIR> 换成 bridge 目录绝对路径",
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "curl -s -X POST http://127.0.0.1:8788/event -H 'Content-Type: application/json' -d '{\"st\":2,\"title\":\"思考\",\"sub\":\"收到新指令\",\"agent\":\"HY3\"}'"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "curl -s -X POST http://127.0.0.1:8788/event -H 'Content-Type: application/json' -d '{\"st\":7,\"title\":\"已完成\",\"sub\":\"本轮回复结束\",\"ttl\":3}'"
+          }
+        ]
+      }
+    ]
+  }
+}
