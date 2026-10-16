@@ -72,6 +72,7 @@ build_flags =
 | `lv_font.h` | 点阵字库→LVGL 字体：自定义 `get_glyph_dsc`/`get_glyph_bitmap` 回调，位图零转换直出 |
 | `transport.h` | 通道抽象（USB 串口） |
 | `wb_net.h` | 无线：手写 MQTT 客户端 + NetTransport + AP 配网 Portal + NVS 配置 |
+| `wb_ota.h` | OTA 无线更新：Web 上传（`/update`）+ ArduinoOTA 双通道，密码 `wbclone` |
 | `cn_font.h` | 16×16 中文点阵 + 8×16 ASCII 点阵（`tools/gen_font.py` 生成） |
 
 ## 烧录方式（三选一）
@@ -158,6 +159,21 @@ python3 -m http.server -d simulator 8080   # 浏览器打开 http://localhost:80
 4. 保存后设备重启，自动连接 WiFi 并订阅，屏幕右上角显示 `WiFi` + 时钟
 
 > 配置存 NVS，重启不丢失。插 USB 线随时可用串口通道。详细排障见 [`docs/wifi-setup.md`](docs/wifi-setup.md)。
+
+## OTA 无线更新（WiFi 推送固件）
+
+首次用 USB 烧录后，后续固件更新全部走 WiFi，不用插线（`wb_ota.h`，两条通道，密码统一 `wbclone`）：
+
+| 通道 | 用法 |
+|---|---|
+| Web OTA（推荐） | 连上 WiFi 后浏览器打开 `http://<设备IP>/update`，密码 `wbclone`，上传 app 镜像 `.bin`，传完自动重启 |
+| ArduinoOTA | Arduino IDE 网络端口 `wb-screen-XXXX.local` 或 PlatformIO `upload_protocol = espota`，密码 `wbclone` |
+
+- 设备 IP：串口日志打印、路由器 DHCP 列表、或 mDNS `wb-screen-XXXX.local`（XXXX = MAC 后四位）
+- 更新写入**非活动 OTA 分区**（Arduino 默认 OTA 分区表），写坏不影响当前固件；成功后自动切分区重启
+- 根路径 `/` 为状态页，`/api/status` 返回 JSON（IP/信号/通道/时长/堆）
+- 前提：设备已连上 WiFi（AP 配网模式下仅 ArduinoOTA 可用，80 端口归配网 portal）
+- 注意：app 分区 1.25MB，后续构建需控制在 1.25MB 以内才能 OTA
 
 ## 屏幕 UI 布局（圆屏 240×240，LVGL）
 

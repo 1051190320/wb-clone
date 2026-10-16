@@ -17,6 +17,7 @@
 #include "ui_lvgl.h"
 #include "transport.h"
 #include "wb_net.h"
+#include "wb_ota.h"
 
 TFT_eSPI tft = TFT_eSPI();
 WbState wb;
@@ -288,6 +289,7 @@ static SerialTransport usbTransport;
 static NetTransport* netTransport = nullptr;
 static ConfigPortal portal;
 static NetConfig netCfg;
+static OtaService ota;
 static uint32_t lastLvTickMs = 0;
 
 void setup() {
@@ -308,15 +310,18 @@ void setup() {
     netTransport = new NetTransport();
     netTransport->cfg = netCfg;
     netTransport->begin();
+    ota.begin(netCfg.name);         // WiFi 通道就绪后自动起 Web OTA
     uiShowWaiting(true);
   } else {                         // 未配网 -> AP 配网 (USB 仍可用)
     portal.start(&netCfg);
     uiShowPortal(true, portal.ssid());
+    ota.begin(netCfg.name);         // 仅 ArduinoOTA (80 端口归配网 portal)
   }
   usbTransport.begin();
 }
 
 void loop() {
+  ota.loop();                      // OTA 无线上传 (ArduinoOTA + Web OTA)
   usbTransport.loop();             // USB 通道始终可用 (向后兼容)
   if (netTransport) {
     netTransport->loop();
